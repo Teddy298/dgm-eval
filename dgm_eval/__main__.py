@@ -380,15 +380,18 @@ def compute_scores(args, reps, test_reps, labels=None):
 
 
 def save_score(scores, output_dir, model, path, ckpt, nsample, is_only=False):
-
     ckpt_str = ""
     if ckpt is not None:
         ckpt_str = f"_ckpt-{os.path.splitext(os.path.basename(ckpt))[0]}"
 
+    def get_three_last_dirs(p):
+        parts = pathlib.Path(p).parts
+        return "-".join(parts[-3:]) if len(parts) > 2 else "-".join(parts)
+
     if is_only:
-        out_str = f"Inception_score_{'-'.join([get_last_directory(p) for p in path])}{ckpt_str}_nimage-{nsample}.txt"
+        out_str = f"Inception_score_{'-'.join([get_three_last_dirs(p) for p in path])}{ckpt_str}_nimage-{nsample}.txt"
     else:
-        out_str = f"fd_{model}_{'-'.join([get_last_directory(p) for p in path])}{ckpt_str}_nimage-{nsample}.txt"
+        out_str = f"fd_{model}_{'-'.join([get_three_last_dirs(p) for p in path])}{ckpt_str}_nimage-{nsample}.txt"
 
     out_path = os.path.join(output_dir, out_str)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -398,6 +401,8 @@ def save_score(scores, output_dir, model, path, ckpt, nsample, is_only=False):
             if key == "realism":
                 continue
             f.write(f"{key}: {value} \n")
+
+
 
 
 def save_scores(scores, args, is_only=False, vendi_scores={}):
