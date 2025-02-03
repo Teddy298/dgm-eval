@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 import time
+import pathlib
 
 from .dataloaders import get_dataloader
 from .heatmaps import visualize_heatmaps
@@ -207,21 +208,27 @@ def compute_representations(DL, model, device, args):
         repsi: float32 (Nimage, ndim)
     """
 
+    def get_two_last_dirs(p):
+        parts = pathlib.Path(p).parts
+        return "-".join(parts[-2:]) if len(parts) > 1 else parts[-1]
+
     if args.load:
-        print(
-            f"Loading saved representations from: {args.output_dir}\n", file=sys.stderr
-        )
-        repsi = load_reps_from_path(args.output_dir, args.model, None, DL)
+        last_two_dirs = get_two_last_dirs(args.output_dir)
+        print(f"Loading saved representations from: {last_two_dirs}\n", file=sys.stderr)
+
+        repsi = load_reps_from_path(last_two_dirs, args.model, None, DL)
         if repsi is not None:
             return repsi
 
-        print(f"No saved representations found: {args.output_dir}\n", file=sys.stderr)
+        print(f"No saved representations found: {last_two_dirs}\n", file=sys.stderr)
 
     print("Calculating Representations\n", file=sys.stderr)
     repsi = get_representations(model, DL, device, normalized=False)
     if args.save:
-        print(f"Saving representations to {args.output_dir}\n", file=sys.stderr)
-        save_outputs(args.output_dir, repsi, args.model, None, DL)
+        last_two_dirs = get_two_last_dirs(args.output_dir)
+        print(f"Saving representations to {last_two_dirs}\n", file=sys.stderr)
+        save_outputs(last_two_dirs, repsi, args.model, None, DL)
+
     return repsi
 
 
