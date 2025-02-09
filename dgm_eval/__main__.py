@@ -208,7 +208,7 @@ def compute_representations(DL, model, device, args):
         repsi: float32 (Nimage, ndim)
     """
 
-    if args.load:
+    if False:
         print(f'Loading saved representations from: {args.output_dir}\n', file=sys.stderr)
         repsi = load_reps_from_path(args.output_dir, args.model, None, DL)
         if repsi is not None:
@@ -218,7 +218,7 @@ def compute_representations(DL, model, device, args):
 
     print('Calculating Representations\n', file=sys.stderr)
     repsi = get_representations(model, DL, device, normalized=False)
-    if args.save:
+    if False:
         print(f'Saving representations to {args.output_dir}\n', file=sys.stderr)
         save_outputs(args.output_dir, repsi, args.model, None, DL)
     return repsi

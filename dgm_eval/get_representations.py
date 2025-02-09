@@ -144,7 +144,70 @@ parser.add_argument(
     help="Model architecture. If none specified use default specified in model class",
 )
 
+parser.add_argument(
+    "--metrics",
+    type=str,
+    nargs="+",
+    default=[
+        "fd",
+        "fd-infinity",
+        "kd",
+        "prdc",
+        "is",
+        "authpct",
+        "ct",
+        "ct_test",
+        "ct_modified",
+        "fls",
+        "fls_overfit",
+        "vendi",
+        "sw_approx",
+    ],
+    help="metrics to compute",
+)
+parser.add_argument(
+    "--depth",
+    type=int,
+    default=0,
+    help="Negative depth for internal layers, positive 1 for after projection head.",
+)
 
+parser.add_argument(
+    "--clean_resize", action="store_true", help="Use clean resizing (from pillow)"
+)
+
+
+parser.add_argument(
+    "--heatmaps",
+    action="store_true",
+    help="Generate heatmaps showing the fd focus on images.",
+)
+
+parser.add_argument(
+    "--heatmaps-perturbation",
+    action="store_true",
+    help="Add some perturbation to the images on which gradcam is applied.",
+)
+
+parser.add_argument(
+    "--splits", type=int, default=10, help="num of splits for Inception Score(is)"
+)
+
+parser.add_argument(
+    "--nsample",
+    type=int,
+    default=50000,
+    help="Maximum number of images to use for calculation",
+)
+parser.add_argument(
+    "--save", action="store_false", help="Save representations to output_dir"
+)
+
+parser.add_argument(
+    "--load",
+    action="store_false",
+    help="Load representations and statistics from previous runs if possible",
+)
 parser.set_defaults(load=True)
 
 parser.add_argument("--seed", type=int, default=13579, help="Random seed")
