@@ -230,7 +230,14 @@ def compute_scores(args, reps, test_reps, labels=None):
     vendi_scores = None
 
     if "energy" in args.metrics:
+        scores["energy_jax"] = energy(*reps)
+        test_comparison = [reps[1], test_reps]
+        scores["energy_test_jax"] = energy(*test_comparison)
+        scores["MMM_energy_jax"] = scores["energy_test_jax"] / 2 + (
+                scores["energy_test_jax"] / (scores["energy_jax"] + scores["energy_test_jax"])
+        )
 
+        '''
         print("Computing Energy with JAX\n", file=sys.stderr)
 
         # Measure time for jax computation
@@ -244,7 +251,6 @@ def compute_scores(args, reps, test_reps, labels=None):
         jax_time = time.time() - start_time
         print(f"JAX computations took {jax_time:.6f} seconds", file=sys.stderr)
 
-        '''
         print("Computing Energy \n", file=sys.stderr)
 
         # Measure time for non-jax computation

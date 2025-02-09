@@ -9,3 +9,4 @@ from .vendi import compute_vendi_score, compute_per_class_vendi_scores
 from .prdc import compute_prdc
 from .energy import compute_energy_with_reps_naive_jax
 from .energy import compute_energy_with_reps_naive
+from .energy_optimized import energy
