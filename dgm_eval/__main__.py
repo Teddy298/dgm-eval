@@ -209,17 +209,19 @@ def compute_representations(DL, model, device, args):
     """
 
     if args.load:
-        print(f'Loading saved representations from: {args.output_dir}\n', file=sys.stderr)
+        print(
+            f"Loading saved representations from: {args.output_dir}\n", file=sys.stderr
+        )
         repsi = load_reps_from_path(args.output_dir, args.model, None, DL)
         if repsi is not None:
             return repsi
 
-        print(f'No saved representations found: {args.output_dir}\n', file=sys.stderr)
+        print(f"No saved representations found: {args.output_dir}\n", file=sys.stderr)
 
-    print('Calculating Representations\n', file=sys.stderr)
+    print("Calculating Representations\n", file=sys.stderr)
     repsi = get_representations(model, DL, device, normalized=False)
     if args.save:
-        print(f'Saving representations to {args.output_dir}\n', file=sys.stderr)
+        print(f"Saving representations to {args.output_dir}\n", file=sys.stderr)
         save_outputs(args.output_dir, repsi, args.model, None, DL)
     return repsi
 
@@ -239,12 +241,13 @@ def compute_scores(args, reps, test_reps, labels=None):
         test_comparison = [reps[1], test_reps]
         scores["energy_test_jax"] = compute_energy_with_reps_naive_jax(*test_comparison)
         scores["MMM_energy_jax"] = scores["energy_test_jax"] / 2 + (
-                scores["energy_test_jax"] / (scores["energy_jax"] + scores["energy_test_jax"])
+            scores["energy_test_jax"]
+            / (scores["energy_jax"] + scores["energy_test_jax"])
         )
         jax_time = time.time() - start_time
         print(f"JAX computations took {jax_time:.6f} seconds", file=sys.stderr)
 
-        '''
+        """
         print("Computing Energy \n", file=sys.stderr)
 
         # Measure time for non-jax computation
@@ -257,7 +260,7 @@ def compute_scores(args, reps, test_reps, labels=None):
         )
         non_jax_time = time.time() - start_time
         print(f"Non-JAX computation took {non_jax_time:.6f} seconds", file=sys.stderr)
-        '''
+        """
 
     if "fd" in args.metrics:
         print("Computing FD \n", file=sys.stderr)
@@ -402,8 +405,6 @@ def save_score(scores, output_dir, model, path, ckpt, nsample, is_only=False):
             f.write(f"{key}: {value} \n")
 
 
-
-
 def save_scores(scores, args, is_only=False, vendi_scores={}):
 
     pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
@@ -491,34 +492,60 @@ def main():
         sinception=True if args.model == "sinception" else False,
         depth=args.depth,
     )
-    dataloader_real = get_dataloader_from_path(
-        args.path[0], model.transform, num_workers, args
-    )
-    reps_real = compute_representations(dataloader_real, model, device, args)
 
-    # Get test representations
-    repsi_test = None
-    if args.test_path is not None:
-        dataloader_test = get_dataloader_from_path(
-            args.test_path, model.transform, num_workers, args
+    if args.reps:
+        saved_file = np.load(os.path.join(args.path[0], "reps.npz"))
+        reps_real = saved_file["reps"]
+
+        repsi_test = None
+        if args.test_path is not None:
+            saved_file = np.load(os.path.join(args.test_path, "reps.npz"))
+            reps_real = saved_file["reps"]
+    else:
+        dataloader_real = get_dataloader_from_path(
+            args.path[0], model.transform, num_workers, args
         )
+        reps_real = compute_representations(dataloader_real, model, device, args)
 
-        repsi_test = compute_representations(dataloader_test, model, device, args)
+        # Get test representations
+        repsi_test = None
+        if args.test_path is not None:
+            dataloader_test = get_dataloader_from_path(
+                args.test_path, model.transform, num_workers, args
+            )
+
+            repsi_test = compute_representations(dataloader_test, model, device, args)
 
     # Loop over all generated paths
     all_scores = {}
     vendi_scores = {}
     for i, path in enumerate(args.path[1:]):
-
-        dataloaderi = get_dataloader_from_path(
-            path,
-            model.transform,
-            num_workers,
-            args,
-            sample_w_replacement=True if ":train" in path else False,
-        )
-        repsi = compute_representations(dataloaderi, model, device, args)
-        reps = [reps_real, repsi]
+        if args.reps:
+            real_dataset_path = path.split("/")
+            real_dataset_path.remove("dinov2")
+            target_pos = real_dataset_path.index("CIFAR10-dgm_eval_reps")
+            real_dataset_path[target_pos] = "CIFAR10-dgm_eval"
+            new_path = "/".join(real_dataset_path)
+            dataloaderi = get_dataloader_from_path(
+                new_path,
+                model.transform,
+                num_workers,
+                args,
+                sample_w_replacement=True if ":train" in path else False,
+            )
+            saved_file = np.load(os.path.join(path, "reps.npz"))
+            repsi = saved_file["reps"]
+            reps = [reps_real, repsi]
+        else:
+            dataloaderi = get_dataloader_from_path(
+                path,
+                model.transform,
+                num_workers,
+                args,
+                sample_w_replacement=True if ":train" in path else False,
+            )
+            repsi = compute_representations(dataloaderi, model, device, args)
+            reps = [reps_real, repsi]
 
         print(
             f"Computing scores between reference dataset and {path}\n", file=sys.stderr
