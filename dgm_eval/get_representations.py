@@ -200,15 +200,16 @@ def main():
         depth=args.depth,
     )
 
-    for img_path, output_path in zip(relevant_paths, output_paths):
+    for img_path, output_dir in zip(relevant_paths, output_paths):
         dataloader = get_dataloader_from_path(
             img_path, model.transform, num_workers, args
         )
 
         representations = compute_representations(dataloader, model, device, args)
 
+        os.makedirs(output_dir, exist_ok=True)
 
-        output_path = os.path.join(output_path, "repr.npz")
+        output_path = os.path.join(output_dir, "repr.npz")
         print(f"Saving representations to {output_path}\n", file=sys.stderr)
         hyperparams = vars(dataloader).copy()  # Remove keys that can't be pickled
         hyperparams.pop("transform")
