@@ -145,6 +145,12 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--reps",
+    action="store_true",
+    help="Load representations.",
+)
+
+parser.add_argument(
     "--no-load",
     action="store_false",
     dest="load",
