@@ -249,7 +249,6 @@ def compute_scores(args, reps, test_reps, labels=None):
         start_time = time.time()
         scores["energy_jax"] = compute_energy_with_reps_naive_jax(*reps)
         test_comparison = [reps[1], test_reps]
-        print(reps[1], test_reps)
         scores["energy_test_jax"] = compute_energy_with_reps_naive_jax(*test_comparison)
         scores["MMM_energy_jax"] = scores["energy_test_jax"] / 2 + (
             scores["energy_test_jax"]
@@ -510,7 +509,6 @@ def main():
         saved_file = np.load(real_path)
         reps_real = saved_file["reps"]
         print("Loaded reps real")
-        print(reps_real.shape)
         repsi_test = None
         if args.test_path is not None:
             test_path = os.path.join(args.test_path, "repr.npz")
@@ -518,7 +516,6 @@ def main():
             saved_file = np.load(test_path)
             repsi_test = saved_file["reps"]
             print("Loaded reps test")
-            print(repsi_test.shape)
     else:
         dataloader_real = get_dataloader_from_path(
             args.path[0], model.transform, num_workers, args
