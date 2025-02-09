@@ -231,11 +231,17 @@ def compute_scores(args, reps, test_reps, labels=None):
 
     if "energy" in args.metrics:
 
-        scores["energy_jax"] = energy(*reps)
+        scores["energy_train_jax"] = energy(*reps)['result']
+        scores["k_xx_train"] = energy(*reps)['k_xx']
+        scores["k_yy_train"] = energy(*reps)['k_yy']
+        scores["k_xy_train"] = energy(*reps)['k_xy']
         test_comparison = [reps[1], test_reps]
-        scores["energy_test_jax"] = energy(*test_comparison)
+        scores["energy_test_jax"] = energy(*test_comparison)['result']
+        scores["k_xx_test"] = energy(*test_comparison)['k_xx']
+        scores["k_yy_test"] = energy(*test_comparison)['k_yy']
+        scores["k_xy_test"] = energy(*test_comparison)['k_xy']
         scores["MMM_energy_jax"] = scores["energy_test_jax"] / 2 + (
-                scores["energy_test_jax"] / (scores["energy_jax"] + scores["energy_test_jax"])
+                scores["energy_test_jax"] / (scores["energy_train_jax"] + scores["energy_test_jax"])
         )
 
         '''

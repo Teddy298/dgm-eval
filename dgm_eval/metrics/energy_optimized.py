@@ -56,4 +56,9 @@ def energy(x, y):
       )
   )
 
-  return (2 * k_xy - k_xx - k_yy)/(2 * k_xy)
+  return {
+    "k_xx": k_xx,
+    "k_xy": k_xy,
+    "k_yy": k_yy,
+    "result": (2 * k_xy - k_xx - k_yy) / (2 * k_xy)
+  }
