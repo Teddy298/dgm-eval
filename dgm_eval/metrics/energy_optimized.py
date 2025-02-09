@@ -33,7 +33,7 @@ def energy(x, y):
   x_sqnorms = jnp.diag(jnp.matmul(x, x.T))
   y_sqnorms = jnp.diag(jnp.matmul(y, y.T))
 
-  k_xx = jnp.mean(
+  k_xx = n_x/(n_x-1) * jnp.mean(
       jnp.sqrt(
               -2 * jnp.matmul(x, x.T)
               + jnp.expand_dims(x_sqnorms, 1)
@@ -48,7 +48,7 @@ def energy(x, y):
               + jnp.expand_dims(y_sqnorms, 0)
       )
   )
-  k_yy = jnp.mean(
+  k_yy = n_y/(n_y-1) * jnp.mean(
       jnp.sqrt(
               -2 * jnp.matmul(y, y.T)
               + jnp.expand_dims(y_sqnorms, 1)
