@@ -10,3 +10,4 @@ from .prdc import compute_prdc
 from .energy import compute_energy_with_reps_naive_jax
 from .energy import compute_energy_with_reps_naive
 from .energy_optimized import energy
+from .cmmd import cmmd

@@ -8,6 +8,7 @@ import pandas as pd
 import torch
 import time
 import pathlib
+from scipy.spatial.distance import cdist
 
 from .dataloaders import get_dataloader
 from .heatmaps import visualize_heatmaps
@@ -228,6 +229,14 @@ def compute_scores(args, reps, test_reps, labels=None):
 
     scores = {}
     vendi_scores = None
+
+    if "cmmd" in args.metrics:
+        scores["cmmd_train"] = cmmd(*reps)
+        test_comparison = [reps[1], test_reps]
+        scores["cmmd_test"] = cmmd(*test_comparison)
+        scores["MMM_cmmd"] = scores["cmmd_test"] / 2 + (
+                scores["cmmd_test"] / (scores["cmmd_train"] + scores["cmmd_test"])
+        )
 
     if "energy" in args.metrics:
 
