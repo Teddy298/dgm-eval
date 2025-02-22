@@ -15,7 +15,8 @@ from .helpers import get_last_directory
 from .metrics import *
 from .models import MODELS, InceptionEncoder, load_encoder
 from .representations import get_representations, load_reps_from_path, save_outputs
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "fld")))
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fld")))
 from fld.metrics.FLD import FLD
 
 parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
