@@ -1,3 +1,4 @@
+print("BEGGINING READING FILE")
 import os
 import pathlib
 import sys
@@ -215,8 +216,13 @@ parser.add_argument("--seed", type=int, default=13579, help="Random seed")
 
 
 
-def get_relevant_paths(main_folder_path, key_value="%"):
-    return [x[0] for x in os.walk(main_folder_path) if key_value in x[0]]
+def get_relevant_paths(main_folder_path):
+    rel_paths = []
+    for x in os.walk(main_folder_path):
+        path = x[0]
+        if ('80%' in path) and ('DDIM' in path):
+                rel_paths.append(path)
+    return rel_paths
 
 def create_output_paths(main_folder_path, model, paths):
     main_folder_split = main_folder_path.split('/')
@@ -234,7 +240,7 @@ def create_output_paths(main_folder_path, model, paths):
     return outputs_paths
 
 def main():
-    print("Starting man in get_representation")
+    print("Starting main in get_representation")
     args = parser.parse_args()
 
     main_folder_path = args.folder_path
@@ -245,11 +251,6 @@ def main():
     print(f"{output_paths=}")
 
     device, num_workers = get_device_and_num_workers(args.device, args.num_workers)
-
-    IS_scores = None
-    if "is" in args.metrics and args.model == "inception":
-        # Does not require a reference dataset, so compute first.
-        IS_scores = get_inception_scores(args, device, num_workers)
 
     print("Loading Model", file=sys.stderr)
     # Get train representations
