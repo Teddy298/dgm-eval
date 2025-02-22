@@ -8,13 +8,15 @@ import pandas as pd
 import torch
 import time
 import pathlib
-
+from scipy.spatial.distance import cdist
 from .dataloaders import get_dataloader
 from .heatmaps import visualize_heatmaps
 from .helpers import get_last_directory
 from .metrics import *
 from .models import MODELS, InceptionEncoder, load_encoder
 from .representations import get_representations, load_reps_from_path, save_outputs
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "fld")))
+from fld.metrics.FLD import FLD
 
 parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
 
@@ -271,6 +273,32 @@ def compute_scores(args, reps, test_reps, labels=None):
         non_jax_time = time.time() - start_time
         print(f"Non-JAX computation took {non_jax_time:.6f} seconds", file=sys.stderr)
         """
+
+    if "cmmd_optimized" in args.metrics:
+        scores["cmmd_train"], mianownik = cmmd_blockwise(*reps)
+        test_comparison = [reps[1], test_reps]
+        scores["cmmd_test"], scores["mianownik_test"] = cmmd_blockwise(*test_comparison)
+        scores["MMM_cmmd"] = scores["cmmd_test"] /(scores["mianownik_test"] * 2) + (1/2) * (
+                scores["cmmd_test"] / (scores["cmmd_train"] + scores["cmmd_test"])
+        )
+
+    if "cmmd" in args.metrics:
+        scores["cmmd_train"], mianownik = cmmd(*reps)
+        test_comparison = [reps[1], test_reps]
+        scores["cmmd_test"], scores["mianownik_test"] = cmmd(*test_comparison)
+        scores["pierwszy_skladnik"] = scores["cmmd_test"] / (2 * scores["mianownik_test"])
+        scores["drugi_skladnik"] = scores["cmmd_test"] / (scores["cmmd_train"] + scores["cmmd_test"])
+        scores["MMM_cmmd"] = scores["cmmd_test"] / (2 * scores["mianownik_test"]) + (1/2) * (
+                scores["cmmd_test"] / (scores["cmmd_train"] + scores["cmmd_test"])
+        )
+
+    if "fld" in args.metrics:
+        fld = FLD().compute_metric(
+            train_feat=torch.tensor(reps[0]),
+            test_feat=torch.tensor(test_reps),
+            gen_feat=torch.tensor(reps[1]),
+        )
+        scores["fld"] = fld
 
     if "fd" in args.metrics:
         print("Computing FD \n", file=sys.stderr)
@@ -537,7 +565,7 @@ def main():
     for i, path in enumerate(args.path[1:]):
         if args.reps:
             real_dataset_path = path.split("/")
-            real_dataset_path.remove("dinov2")
+            real_dataset_path.remove(args.model)
             target_pos = real_dataset_path.index("CIFAR10-dgm_eval_reps")
             real_dataset_path[target_pos] = "CIFAR10-dgm_eval"
             new_path = "/".join(real_dataset_path)
