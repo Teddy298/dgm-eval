@@ -16,7 +16,7 @@ from .metrics import *
 from .models import MODELS, InceptionEncoder, load_encoder
 from .representations import get_representations, load_reps_from_path, save_outputs
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fld")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fld_new")))
 from fld.metrics.FLD import FLD
 
 parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
