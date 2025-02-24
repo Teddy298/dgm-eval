@@ -174,6 +174,12 @@ parser.add_argument(
     help="Negative depth for internal layers, positive 1 for after projection head.",
 )
 
+parser.add_argument(
+    "--fld_gen_size",
+    type=int,
+    default=10000,
+    help="Gen size for the FLD metric if used",
+)
 
 def get_device_and_num_workers(device, num_workers):
     if device is None:
@@ -294,11 +300,12 @@ def compute_scores(args, reps, test_reps, labels=None):
         )
 
     if "fld" in args.metrics:
-        fld = FLD().compute_metric(
+        fld = FLD(gen_size=args.fld_gen_size).compute_metric(
             train_feat=torch.tensor(reps[0]),
             test_feat=torch.tensor(test_reps),
             gen_feat=torch.tensor(reps[1]),
         )
+
         scores["fld"] = fld
 
     if "fd" in args.metrics:
@@ -509,10 +516,61 @@ def get_inception_scores(args, device, num_workers):
 
     return IS_scores
 
+def get_model(args, device):
+    return load_encoder(
+        args.model,
+        device,
+        ckpt=None,
+        arch=None,
+        clean_resize=args.clean_resize,
+        sinception=True if args.model == "sinception" else False,
+        depth=args.depth,
+    )
+def load_reps(args):
+    real_path = os.path.join(args.path[0], "repr.npz")
+    print(f"{real_path=}")
+    saved_file = np.load(real_path)
+    reps_real = saved_file["reps"]
+    print("Loaded reps real")
+    repsi_test = None
+    if args.test_path is not None:
+        test_path = os.path.join(args.test_path, "repr.npz")
+        print(f"{test_path=}")
+        saved_file = np.load(test_path)
+        repsi_test = saved_file["reps"]
+        print("Loaded reps test")
+    return reps_real, repsi_test
+
+def compute_start_reps(args, model, device, num_workers):
+    dataloader_real = get_dataloader_from_path(
+        args.path[0], model.transform, num_workers, args
+    )
+    reps_real = compute_representations(dataloader_real, model, device, args)
+
+    # Get test representations
+    repsi_test = None
+    if args.test_path is not None:
+        dataloader_test = get_dataloader_from_path(
+            args.test_path, model.transform, num_workers, args
+        )
+
+        repsi_test = compute_representations(dataloader_test, model, device, args)
+    return reps_real, repsi_test
+
+
+def compute_repsi(path, model, num_workers, args, device):
+    dataloaderi = get_dataloader_from_path(
+        path,
+        model.transform,
+        num_workers,
+        args,
+        sample_w_replacement=True if ":train" in path else False,
+    )
+    return compute_representations(dataloaderi, model, device, args), dataloaderi
+
 
 def main():
     args = parser.parse_args()
-
     device, num_workers = get_device_and_num_workers(args.device, args.num_workers)
 
     IS_scores = None
@@ -522,44 +580,11 @@ def main():
 
     print("Loading Model", file=sys.stderr)
     # Get train representations
-    model = load_encoder(
-        args.model,
-        device,
-        ckpt=None,
-        arch=None,
-        clean_resize=args.clean_resize,
-        sinception=True if args.model == "sinception" else False,
-        depth=args.depth,
-    )
-
+    model = get_model(args, device)
     if args.reps:
-        real_path = os.path.join(args.path[0], "repr.npz")
-        print(f"{real_path=}")
-        saved_file = np.load(real_path)
-        reps_real = saved_file["reps"]
-        print("Loaded reps real")
-        repsi_test = None
-        if args.test_path is not None:
-            test_path = os.path.join(args.test_path, "repr.npz")
-            print(f"{test_path=}")
-            saved_file = np.load(test_path)
-            repsi_test = saved_file["reps"]
-            print("Loaded reps test")
+        reps_real, repsi_test = load_reps(args)
     else:
-        dataloader_real = get_dataloader_from_path(
-            args.path[0], model.transform, num_workers, args
-        )
-        reps_real = compute_representations(dataloader_real, model, device, args)
-
-        # Get test representations
-        repsi_test = None
-        if args.test_path is not None:
-            dataloader_test = get_dataloader_from_path(
-                args.test_path, model.transform, num_workers, args
-            )
-
-            repsi_test = compute_representations(dataloader_test, model, device, args)
-
+        reps_real, repsi_test = compute_start_reps(args, model, device, num_workers)
     # Loop over all generated paths
     all_scores = {}
     vendi_scores = {}
@@ -582,14 +607,7 @@ def main():
             repsi = saved_file["reps"]
             reps = [reps_real, repsi]
         else:
-            dataloaderi = get_dataloader_from_path(
-                path,
-                model.transform,
-                num_workers,
-                args,
-                sample_w_replacement=True if ":train" in path else False,
-            )
-            repsi = compute_representations(dataloaderi, model, device, args)
+            repsi, dataloaderi = compute_repsi(path, model, num_workers, args, device)
             reps = [reps_real, repsi]
 
         print(
