@@ -50,7 +50,7 @@ class DataLoader():
     Create Datasets and Dataloaders from ImagePathDataset and from torchvision.datasets.
     """
     def __init__(self, path, train_set=False, nsample=-1, transform=None,
-                batch_size=50, num_workers=1, seed=13579, random_sample=True, sample_w_replacement=False):
+                batch_size=50, num_workers=1, seed=13579, random_sample=True, sample_w_replacement=False, k=10):
 
         self.path = path
         self.train_set = train_set 
@@ -60,6 +60,7 @@ class DataLoader():
         self.seed = seed
         # for class conditional models, remember the labels as loading
         self.labels = []
+        self.k = k
 
         self.random_sample = random_sample
         self.sample_w_replacement = sample_w_replacement
@@ -116,6 +117,9 @@ class DataLoader():
         if not self.files:
             # Assume sub-folders for image classes
             class_dirs = sorted(image_path.glob('*'), key=get_order) # look for all subfolders in the numerical order
+            class_dirs = class_dirs[:self.k]
+            print(f"Taking {self.k=} classes")
+            print(f"{class_dirs=}")
             self.files = []
             for f in class_dirs:
                 files_in_path = get_files_at_path(f)
@@ -192,7 +196,7 @@ class DataLoader():
                                              num_workers=self.num_workers)
 
 
-def get_dataloader(path, nsample=-1, batch_size=32, num_workers=1, transform=None, seed=13579, random_sample=True, sample_w_replacement=False):
+def get_dataloader(path, nsample=-1, batch_size=32, num_workers=1, transform=None, seed=13579, random_sample=True, sample_w_replacement=False, k=10):
     """Deal with format of input path, and get relevant DataLoader"""
 
     train_str='test'
@@ -206,6 +210,6 @@ def get_dataloader(path, nsample=-1, batch_size=32, num_workers=1, transform=Non
     DL = DataLoader(path, train_set=train_set, nsample=nsample,
                     batch_size=batch_size, num_workers=num_workers,
                     transform=transform, seed=seed,
-                    random_sample=random_sample, sample_w_replacement=sample_w_replacement)
+                    random_sample=random_sample, sample_w_replacement=sample_w_replacement, k=k)
 
     return DL

@@ -154,6 +154,11 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--fig_6",
+    action="store_true",
+    help="Load only test and train representations.",
+)
+parser.add_argument(
     "--no-load",
     action="store_false",
     dest="load",
@@ -174,6 +179,12 @@ parser.add_argument(
     help="Negative depth for internal layers, positive 1 for after projection head.",
 )
 
+parser.add_argument(
+    "--k",
+    type=int,
+    default=0,
+    help="Num of classes to take: k.",
+)
 parser.add_argument(
     "--fld_gen_size",
     type=int,
@@ -565,6 +576,7 @@ def compute_repsi(path, model, num_workers, args, device):
         num_workers,
         args,
         sample_w_replacement=True if ":train" in path else False,
+        args.k
     )
     return compute_representations(dataloaderi, model, device, args), dataloaderi
 
@@ -581,7 +593,7 @@ def main():
     print("Loading Model", file=sys.stderr)
     # Get train representations
     model = get_model(args, device)
-    if args.reps:
+    if args.reps or args.fig_6:
         reps_real, repsi_test = load_reps(args)
     else:
         reps_real, repsi_test = compute_start_reps(args, model, device, num_workers)
