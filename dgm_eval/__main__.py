@@ -347,10 +347,10 @@ def compute_scores(args, reps, test_reps, labels=None):
 
     if "fd" in args.metrics:
         print("Computing FD \n", file=sys.stderr)
-        scores["fd_train"] = compute_FD_with_reps(*reps)
+        scores["fid_train"] = compute_FD_with_reps(*reps)
         test_comparison = [reps[1], test_reps]
-        scores["fd_test"] = compute_FD_with_reps(*test_comparison)
-        scores["MMM_fd"] = (scores["fd_test"] / (scores["fd_train"] + scores["fd_test"])) / 2
+        scores["fid_test"] = compute_FD_with_reps(*test_comparison)
+        scores["MMM_fd"] = (scores["fid_test"] / (scores["fid_train"] + scores["fid_test"])) / 2
         scores["fid_gap"] = scores["fid_train"] - scores["fid_test"]
 
 
