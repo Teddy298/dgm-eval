@@ -81,6 +81,9 @@ parser.add_argument(
 
 parser.add_argument("--test_path", type=str, default=None, help=("Path to test images"))
 
+
+parser.add_argument("--distortion", type=str, default="none", help=("Distortion to apply to images"))
+
 parser.add_argument(
     "--metrics",
     type=str,
@@ -191,6 +194,12 @@ parser.add_argument(
     default=10000,
     help="Gen size for the FLD metric if used",
 )
+parser.add_argument(
+    "--eval_feat",
+    type=str,
+    default="test",
+    help="Set eval feat for fld",
+)
 
 def get_device_and_num_workers(device, num_workers):
     if device is None:
@@ -220,8 +229,10 @@ def get_dataloader_from_path(
         seed=args.seed,
         sample_w_replacement=sample_w_replacement,
         transform=lambda x: model_transform(x),
+        k=args.k,
+        distortion=args.distortion,
     )
-
+    print("DataLoader loaded")
     return dataloader
 
 
@@ -257,7 +268,7 @@ def compute_representations(DL, model, device, args):
 
 
 def compute_scores(args, reps, test_reps, labels=None):
-
+    print(f"Searching for metrics: {args.metrics=}")
     scores = {}
     vendi_scores = None
 
@@ -301,30 +312,47 @@ def compute_scores(args, reps, test_reps, labels=None):
         )
 
     if "cmmd" in args.metrics:
-        scores["cmmd_train"], mianownik = cmmd(*reps)
+        print("Computing cmmd")
+        scores["cmmd_train"], mianownik, _ = cmmd(*reps)
         test_comparison = [reps[1], test_reps]
-        scores["cmmd_test"], scores["mianownik_test"] = cmmd(*test_comparison)
+        scores["cmmd_test"], scores["mianownik_test"], all_components = cmmd(*test_comparison)
+
+        scores["k_xx"] = all_components["k_xx"]
+        scores["k_yy"] = all_components["k_yy"]
+        scores["k_xy"] = all_components["k_xy"]
+
         scores["pierwszy_skladnik"] = scores["cmmd_test"] / (2 * scores["mianownik_test"])
         scores["drugi_skladnik"] = scores["cmmd_test"] / (scores["cmmd_train"] + scores["cmmd_test"])
+
         scores["MMM_cmmd"] = scores["cmmd_test"] / (2 * scores["mianownik_test"]) + (1/2) * (
                 scores["cmmd_test"] / (scores["cmmd_train"] + scores["cmmd_test"])
         )
 
     if "fld" in args.metrics:
-        fld = FLD(gen_size=args.fld_gen_size).compute_metric(
-            train_feat=torch.tensor(reps[0]),
-            test_feat=torch.tensor(test_reps),
-            gen_feat=torch.tensor(reps[1]),
-        )
-
-        scores["fld"] = fld
+        print("Computing fld")
+        if args.eval_feat == "gap":
+            fld = FLD(gen_size=args.fld_gen_size, eval_feat=args.eval_feat).compute_metric(
+                train_feat=torch.tensor(reps[0]),
+                test_feat=torch.tensor(test_reps),
+                gen_feat=torch.tensor(reps[1]),
+            )
+            scores["fld_gap"] = fld
+        else:
+            fld = FLD(gen_size=args.fld_gen_size, eval_feat=args.eval_feat).compute_metric(
+                train_feat=torch.tensor(reps[0]),
+                test_feat=torch.tensor(test_reps),
+                gen_feat=torch.tensor(reps[1]),
+            )
+            scores["fld"] = fld
 
     if "fd" in args.metrics:
         print("Computing FD \n", file=sys.stderr)
-        scores["fd"] = compute_FD_with_reps(*reps)
+        scores["fd_train"] = compute_FD_with_reps(*reps)
         test_comparison = [reps[1], test_reps]
         scores["fd_test"] = compute_FD_with_reps(*test_comparison)
-        scores["MMM_fd"] = (scores["fd_test"] / (scores["fd"] + scores["fd_test"])) / 2
+        scores["MMM_fd"] = (scores["fd_test"] / (scores["fd_train"] + scores["fd_test"])) / 2
+        scores["fid_gap"] = scores["fid_train"] - scores["fid_test"]
+
 
     if "fd_eff" in args.metrics:
         print("Computing Efficient FD \n", file=sys.stderr)
@@ -570,18 +598,19 @@ def compute_start_reps(args, model, device, num_workers):
 
 
 def compute_repsi(path, model, num_workers, args, device):
+    print("compute_repsi")
     dataloaderi = get_dataloader_from_path(
         path,
         model.transform,
         num_workers,
         args,
         sample_w_replacement=True if ":train" in path else False,
-        args.k
     )
     return compute_representations(dataloaderi, model, device, args), dataloaderi
 
 
 def main():
+    print("main")
     args = parser.parse_args()
     device, num_workers = get_device_and_num_workers(args.device, args.num_workers)
 

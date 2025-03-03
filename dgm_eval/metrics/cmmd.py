@@ -121,8 +121,12 @@ def cmmd(x, y):
           axis=(0, 1)  # Summing over both matrix dimensions
       ) - jnp.log(y.shape[0] * y.shape[0])  # Normalize properly
   )
-
-  return (k_xx_logsumexp + k_yy_logsumexp - 2 * k_xy_logsumexp, k_xx_logsumexp + k_yy_logsumexp)
+  all_components = {
+          "k_xx": k_xx_logsumexp,
+          "k_yy": k_yy_logsumexp,
+          "k_xy": k_xy_logsumexp
+          }
+  return k_xx_logsumexp + k_yy_logsumexp - 2 * k_xy_logsumexp, k_xx_logsumexp + k_yy_logsumexp, all_components
 
 _BLOCK_SIZE = 1000  # Hardcoded block size
 

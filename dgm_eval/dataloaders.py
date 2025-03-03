@@ -7,6 +7,8 @@ import torch
 import torchvision
 
 import torchvision.transforms
+import io
+
 
 from PIL import Image
 
@@ -23,7 +25,24 @@ def get_files_at_path(path):
                     for file in path.glob(f'*.{ext}')])
 
     return files
-
+def apply_jpeg_compression(img, quality=75):
+    # Convert the tensor to a PIL image
+    img = torchvision.transforms.ToPILImage()(img)
+    
+    # Create a buffer to store the image data
+    buffer = io.BytesIO()
+    
+    # Save the image as JPEG with the specified quality
+    img.save(buffer, format="JPEG", quality=quality)
+    
+    # Load the image back from the buffer
+    buffer.seek(0)
+    img = Image.open(buffer)
+    
+    # Convert the PIL image back to a tensor
+    img = torchvision.transforms.ToTensor()(img)
+    
+    return img
 
 class ImagePathDataset(torch.utils.data.Dataset):
     """
@@ -31,9 +50,10 @@ class ImagePathDataset(torch.utils.data.Dataset):
 
     Files must have image extensions specified in IMAGE_EXTENSIONS
     """
-    def __init__(self, files, transform=None):
+    def __init__(self, files, transform=None, distortion="none"):
         self.files = sorted(files)
         self.transform = transform
+        self.distortion = distortion
 
     def __len__(self):
         return len(self.files)
@@ -43,6 +63,36 @@ class ImagePathDataset(torch.utils.data.Dataset):
         img = Image.open(path).convert('RGB')
         if self.transform is not None:
             img = self.transform(img)
+            if self.distortion == "none":
+                pass
+            elif self.distortion == "posterize":
+                posterize = torchvision.transforms.Lambda(lambda img: ((img * 255).to(torch.uint8) & 0b11110000).float() / 255.0)
+                img = posterize(img)
+            elif self.distortion == "blur":
+                light_blur = torchvision.transforms.GaussianBlur(kernel_size=3, sigma=(0.5))  # Light Gaussian blur
+                img = light_blur(img)
+            elif self.distortion == "heavy_blur":
+                heavy_blur = torchvision.transforms.GaussianBlur(kernel_size=5, sigma=1.4)  # Heavy Gaussian blur
+                img = heavy_blur(img)
+            elif self.distortion == "resize":
+                resize = torchvision.transforms.Resize((196, 196))  # Resize to 224x224
+                img = resize(img)
+            elif self.distortion == "center_crop30":
+                center_crop_30 = torchvision.transforms.CenterCrop(30)  # Center crop to 30x30
+                img = center_crop_30(img)
+            elif self.distortion == "center_crop28":
+                center_crop_28 = torchvision.transforms.CenterCrop(28)  # Center crop to 30x30
+                img = center_crop_28(img)
+            elif self.distortion == "color_distort":
+                color_distort = torchvision.transforms.ColorJitter()  # Random color distortion
+                img = color_distort(img)
+            elif self.distortion == "elastic_transform":
+                elastic_transform = torchvision.transforms.ElasticTransform()  # Elastic transformation
+                img = elastic_transform(img)
+            elif self.distortion == "jpg75":
+                img = apply_jpeg_compression(img, quality=75)
+            elif self.distortion == "jpg90":
+                img = apply_jpeg_compression(img, quality=90)
         return img
 
 class DataLoader():
@@ -50,8 +100,8 @@ class DataLoader():
     Create Datasets and Dataloaders from ImagePathDataset and from torchvision.datasets.
     """
     def __init__(self, path, train_set=False, nsample=-1, transform=None,
-                batch_size=50, num_workers=1, seed=13579, random_sample=True, sample_w_replacement=False, k=10):
-
+                 batch_size=50, num_workers=1, seed=13579, random_sample=True, sample_w_replacement=False, k=10, distortion="none"):
+        print("DataLoader init")
         self.path = path
         self.train_set = train_set 
         self.nsample = nsample
@@ -69,11 +119,12 @@ class DataLoader():
             print((f'Warning: sample_w_replacement={sample_w_replacement}.'
                     f'Sampling with replacement from path {path}'), file=sys.stderr)
             self.seed += 1
-
+        self.distortion = distortion
         self.transform = transform
+        print(f"{self.transform=}")
         if not transform:
             self.transform = torchvision.transforms.ToTensor()
-
+        
         self.get_dataset()
 
         if (self.nsample > 0) and (len(self.data_set) > self.nsample):
@@ -131,7 +182,9 @@ class DataLoader():
 
         # Confirm data at path is in proper format
         try:
-            self.data_set = ImagePathDataset(self.files, transform=self.transform)
+            print(f"Applying distortion: {self.distortion=}")
+            self.data_set = ImagePathDataset(self.files, transform=self.transform, distortion=self.distortion)
+            print(f"Applied {self.distortion=}")
         except:
             raise RuntimeError(f'Images cannot be loaded from {self.path}. Expecting path full of images: {IMAGE_EXTENSIONS}')
    
@@ -196,9 +249,9 @@ class DataLoader():
                                              num_workers=self.num_workers)
 
 
-def get_dataloader(path, nsample=-1, batch_size=32, num_workers=1, transform=None, seed=13579, random_sample=True, sample_w_replacement=False, k=10):
+def get_dataloader(path, nsample=-1, batch_size=32, num_workers=1, transform=None, seed=13579, random_sample=True, sample_w_replacement=False, k=10, distortion="none"):
     """Deal with format of input path, and get relevant DataLoader"""
-
+    print("dataloaders.py")
     train_str='test'
     if ':' in path:
         # Path is instead torchvision.dataset
@@ -210,6 +263,6 @@ def get_dataloader(path, nsample=-1, batch_size=32, num_workers=1, transform=Non
     DL = DataLoader(path, train_set=train_set, nsample=nsample,
                     batch_size=batch_size, num_workers=num_workers,
                     transform=transform, seed=seed,
-                    random_sample=random_sample, sample_w_replacement=sample_w_replacement, k=k)
+                    random_sample=random_sample, sample_w_replacement=sample_w_replacement, k=k, distortion=distortion)
 
     return DL
