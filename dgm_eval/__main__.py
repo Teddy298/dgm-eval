@@ -157,7 +157,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--fig_6",
+    "--use_test_train_repr",
     action="store_true",
     help="Load only test and train representations.",
 )
@@ -622,7 +622,7 @@ def main():
     print("Loading Model", file=sys.stderr)
     # Get train representations
     model = get_model(args, device)
-    if args.reps or args.fig_6:
+    if args.reps or args.use_test_train_repr:
         reps_real, repsi_test = load_reps(args)
     else:
         reps_real, repsi_test = compute_start_reps(args, model, device, num_workers)
