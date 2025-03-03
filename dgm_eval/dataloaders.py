@@ -84,7 +84,7 @@ class ImagePathDataset(torch.utils.data.Dataset):
                 center_crop_28 = torchvision.transforms.CenterCrop(28)  # Center crop to 30x30
                 img = center_crop_28(img)
             elif self.distortion == "color_distort":
-                color_distort = torchvision.transforms.ColorJitter()  # Random color distortion
+                color_distort = torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)  # Random color distortion
                 img = color_distort(img)
             elif self.distortion == "elastic_transform":
                 elastic_transform = torchvision.transforms.ElasticTransform()  # Elastic transformation
