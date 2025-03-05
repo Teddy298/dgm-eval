@@ -63,36 +63,36 @@ class ImagePathDataset(torch.utils.data.Dataset):
         img = Image.open(path).convert('RGB')
         if self.transform is not None:
             img = self.transform(img)
-            if self.distortion == "none":
-                pass
-            elif self.distortion == "posterize":
-                posterize = torchvision.transforms.Lambda(lambda img: ((img * 255).to(torch.uint8) & 0b11110000).float() / 255.0)
-                img = posterize(img)
-            elif self.distortion == "blur":
-                light_blur = torchvision.transforms.GaussianBlur(kernel_size=3, sigma=(0.5))  # Light Gaussian blur
-                img = light_blur(img)
-            elif self.distortion == "heavy_blur":
-                heavy_blur = torchvision.transforms.GaussianBlur(kernel_size=5, sigma=1.4)  # Heavy Gaussian blur
-                img = heavy_blur(img)
-            elif self.distortion == "resize":
-                resize = torchvision.transforms.Resize((196, 196))  # Resize to 224x224
-                img = resize(img)
-            elif self.distortion == "center_crop30":
-                center_crop_30 = torchvision.transforms.CenterCrop(30)  # Center crop to 30x30
-                img = center_crop_30(img)
-            elif self.distortion == "center_crop28":
-                center_crop_28 = torchvision.transforms.CenterCrop(28)  # Center crop to 30x30
-                img = center_crop_28(img)
-            elif self.distortion == "color_distort":
-                color_distort = torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)  # Random color distortion
-                img = color_distort(img)
-            elif self.distortion == "elastic_transform":
-                elastic_transform = torchvision.transforms.ElasticTransform()  # Elastic transformation
-                img = elastic_transform(img)
-            elif self.distortion == "jpg75":
-                img = apply_jpeg_compression(img, quality=75)
-            elif self.distortion == "jpg90":
-                img = apply_jpeg_compression(img, quality=90)
+           # if self.distortion == "none":
+           #     pass
+           # elif self.distortion == "posterize":
+           #     posterize = torchvision.transforms.Lambda(lambda img: ((img * 255).to(torch.uint8) & 0b11110000).float() / 255.0)
+           #     img = posterize(img)
+           # elif self.distortion == "blur":
+           #     light_blur = torchvision.transforms.GaussianBlur(kernel_size=3, sigma=(0.5))  # Light Gaussian blur
+           #     img = light_blur(img)
+           # elif self.distortion == "heavy_blur":
+           #     heavy_blur = torchvision.transforms.GaussianBlur(kernel_size=5, sigma=1.4)  # Heavy Gaussian blur
+           #     img = heavy_blur(img)
+           # elif self.distortion == "resize":
+           #     resize = torchvision.transforms.Resize((196, 196))  # Resize to 224x224
+           #     img = resize(img)
+           # elif self.distortion == "center_crop30":
+           #     center_crop_30 = torchvision.transforms.CenterCrop(30)  # Center crop to 30x30
+           #     img = center_crop_30(img)
+           # elif self.distortion == "center_crop28":
+           #     center_crop_28 = torchvision.transforms.CenterCrop(28)  # Center crop to 30x30
+           #     img = center_crop_28(img)
+           # elif self.distortion == "color_distort":
+           #     color_distort = torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)  # Random color distortion
+           #     img = color_distort(img)
+           # elif self.distortion == "elastic_transform":
+           #     elastic_transform = torchvision.transforms.ElasticTransform()  # Elastic transformation
+           #     img = elastic_transform(img)
+           # elif self.distortion == "jpg75":
+           #     img = apply_jpeg_compression(img, quality=75)
+           # elif self.distortion == "jpg90":
+           #     img = apply_jpeg_compression(img, quality=90)
         return img
 
 class DataLoader():
@@ -137,6 +137,7 @@ class DataLoader():
         Get dataset from local path or from torchvision.datasets
         """
         if os.path.exists(self.path):
+            print("LOCAL DATASET")
             self.get_local_dataset()
 
         else:

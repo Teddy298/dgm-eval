@@ -220,7 +220,7 @@ def get_relevant_paths(main_folder_path):
     rel_paths = []
     for x in os.walk(main_folder_path):
         path = x[0]
-        if ('80%' in path) and ('DDIM' in path):
+        if ('CIFAR10/train' in path):
                 rel_paths.append(path)
     return rel_paths
 
@@ -251,7 +251,7 @@ def main():
     print(f"{output_paths=}")
 
     device, num_workers = get_device_and_num_workers(args.device, args.num_workers)
-
+    return
     print("Loading Model", file=sys.stderr)
     # Get train representations
     model = load_encoder(
@@ -263,7 +263,7 @@ def main():
         sinception=True if args.model == "sinception" else False,
         depth=args.depth,
     )
-
+    
     for img_path, output_dir in zip(relevant_paths, output_paths):
         dataloader = get_dataloader_from_path(
             img_path, model.transform, num_workers, args
@@ -273,7 +273,7 @@ def main():
 
         os.makedirs(output_dir, exist_ok=True)
 
-        output_path = os.path.join(output_dir, "repr.npz")
+        output_path = os.path.join(output_dir, "train_50k_repr.npz")
         print(f"Saving representations to {output_path}\n", file=sys.stderr)
         hyperparams = vars(dataloader).copy()  # Remove keys that can't be pickled
         hyperparams.pop("transform")

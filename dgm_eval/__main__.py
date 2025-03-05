@@ -185,7 +185,7 @@ parser.add_argument(
 parser.add_argument(
     "--k",
     type=int,
-    default=0,
+    default=10,
     help="Num of classes to take: k.",
 )
 parser.add_argument(
@@ -632,7 +632,10 @@ def main():
     for i, path in enumerate(args.path[1:]):
         if args.reps:
             real_dataset_path = path.split("/")
+            print(real_dataset_path)
             real_dataset_path.remove(args.model)
+            real_dataset_path.remove('interpolation')
+            real_dataset_path.remove('0%train')
             target_pos = real_dataset_path.index("CIFAR10-dgm_eval_reps")
             real_dataset_path[target_pos] = "CIFAR10-dgm_eval"
             new_path = "/".join(real_dataset_path)
