@@ -57,16 +57,6 @@ def cmmd(x, y):
   y_sqnorms = jnp.diag(jnp.matmul(y, y.T))
 
   gamma = 1 / (2 * _SIGMA**2)
-  k_xx = jnp.mean(
-      jnp.exp(
-          -gamma
-          * (
-              -2 * jnp.matmul(x, x.T)
-              + jnp.expand_dims(x_sqnorms, 1)
-              + jnp.expand_dims(x_sqnorms, 0)
-          )
-      )
-  )
   k_xx_logsumexp = jnp.exp(
       logsumexp(
           -gamma
@@ -79,16 +69,6 @@ def cmmd(x, y):
       ) - jnp.log(x.shape[0] * x.shape[0])  # Normalize properly
   )
 
-  k_xy = jnp.mean(
-      jnp.exp(
-          -gamma
-          * (
-              -2 * jnp.matmul(x, y.T)
-              + jnp.expand_dims(x_sqnorms, 1)
-              + jnp.expand_dims(y_sqnorms, 0)
-          )
-      )
-  )
   k_xy_logsumexp = jnp.exp(
       logsumexp(
           -gamma
@@ -99,16 +79,6 @@ def cmmd(x, y):
           ),
           axis=(0, 1)  # Sum over both matrix dimensions
       ) - jnp.log(x.shape[0] * y.shape[0])  # Correct normalization
-  )
-  k_yy = jnp.mean(
-      jnp.exp(
-          -gamma
-          * (
-              -2 * jnp.matmul(y, y.T)
-              + jnp.expand_dims(y_sqnorms, 1)
-              + jnp.expand_dims(y_sqnorms, 0)
-          )
-      )
   )
   k_yy_logsumexp = jnp.exp(
       logsumexp(

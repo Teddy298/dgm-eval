@@ -319,13 +319,12 @@ def compute_scores(args, train_gen_representations, test_representations, labels
 
     if "fld" in args.metrics:
         print("Computing fld")
-        if args.eval_feat == "gap":
-            fld = FLD(gen_size=args.fld_gen_size, eval_feat=args.eval_feat).compute_metric(
-                train_feat=torch.tensor(train_gen_representations[0]),
-                test_feat=torch.tensor(test_representations),
-                gen_feat=torch.tensor(train_gen_representations[1]),
-            )
-            scores["fld_gap"] = fld
+        fld_gap = FLD(gen_size=args.fld_gen_size, eval_feat="gap").compute_metric(
+            train_feat=torch.tensor(train_gen_representations[0]),
+            test_feat=torch.tensor(test_representations),
+            gen_feat=torch.tensor(train_gen_representations[1]),
+        )
+        scores["fld_gap"] = fld_gap
 
         fld = FLD(gen_size=args.fld_gen_size, eval_feat="test").compute_metric(
             train_feat=torch.tensor(train_gen_representations[0]),
@@ -334,7 +333,7 @@ def compute_scores(args, train_gen_representations, test_representations, labels
         )
         scores["fld"] = fld
 
-    if "fd" in args.metrics:
+    if "fid" in args.metrics:
         print("Computing FD \n", file=sys.stderr)
         scores["fid_train"] = compute_FD_with_reps(*train_gen_representations)
         test_comparison = [train_gen_representations[1], test_representations]
