@@ -82,7 +82,8 @@ parser.add_argument(
 parser.add_argument("--test_path", type=str, default=None, help=("Path to test images"))
 
 
-parser.add_argument("--distortion", type=str, default="none", help=("Distortion to apply to images"))
+parser.add_argument("--distortion", type=str, default="none", help=("Distortion to apply to images: none, posterize, blur, heavy_blur, resize, center_crop30, center_crop28, color_distort, elastic_transform, jpg75, jpg90"))
+
 
 parser.add_argument(
     "--metrics",
@@ -151,13 +152,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--reps",
-    action="store_true",
-    help="Load representations.",
-)
-
-parser.add_argument(
-    "--use_test_train_repr",
+    "--use_train_test_repr",
     action="store_true",
     help="Load only test and train representations.",
 )
@@ -249,26 +244,20 @@ def compute_representations(DL, model, device, args):
         print(
             f"Loading saved representations from: {args.output_dir}\n", file=sys.stderr
         )
-        print(
-            f"Loading saved representations from: {args.output_dir}\n", file=sys.stderr
-        )
-        repsi = load_reps_from_path(args.output_dir, args.model, None, DL)
-        if repsi is not None:
-            return repsi
-
+        representations = load_reps_from_path(args.output_dir, args.model, None, DL)
+        if representations is not None:
+            return representations
         print(f"No saved representations found: {args.output_dir}\n", file=sys.stderr)
 
     print("Calculating Representations\n", file=sys.stderr)
-    repsi = get_representations(model, DL, device, normalized=False)
+    representations = get_representations(model, DL, device, normalized=False)
     if args.save:
-        print(f"Saving representations to {args.output_dir}\n", file=sys.stderr)
-        print(f"Saving representations to {args.output_dir}\n", file=sys.stderr)
-        save_outputs(args.output_dir, repsi, args.model, None, DL)
-    return repsi
+        save_outputs(args.output_dir, representations, args.model, None, DL)
+    return representations
 
 
-def compute_scores(args, reps, test_reps, labels=None):
-    print(f"Searching for metrics: {args.metrics=}")
+def compute_scores(args, train_gen_representations, test_representations, labels=None):
+    print(f"compute_scores() for: {args.metrics=}")
     scores = {}
     vendi_scores = None
 
@@ -278,8 +267,8 @@ def compute_scores(args, reps, test_reps, labels=None):
 
         # Measure time for jax computation
         start_time = time.time()
-        scores["energy_jax"] = compute_energy_with_reps_naive_jax(*reps)
-        test_comparison = [reps[1], test_reps]
+        scores["energy_jax"] = compute_energy_with_reps_naive_jax(*train_gen_representations)
+        test_comparison = [train_gen_representations[1], test_representations]
         scores["energy_test_jax"] = compute_energy_with_reps_naive_jax(*test_comparison)
         scores["MMM_energy_jax"] = scores["energy_test_jax"] / 2 + (
             scores["energy_test_jax"]
@@ -304,17 +293,17 @@ def compute_scores(args, reps, test_reps, labels=None):
         """
 
     if "cmmd_optimized" in args.metrics:
-        scores["cmmd_train"], mianownik = cmmd_blockwise(*reps)
-        test_comparison = [reps[1], test_reps]
+        scores["cmmd_train"], mianownik = cmmd_blockwise(*train_gen_representations)
+        test_comparison = [train_gen_representations[1], test_representations]
         scores["cmmd_test"], scores["mianownik_test"] = cmmd_blockwise(*test_comparison)
-        scores["MMM_cmmd"] = scores["cmmd_test"] /(scores["mianownik_test"] * 2) + (1/2) * (
+        scores["M_PALATE"] = scores["cmmd_test"] /(scores["mianownik_test"] * 2) + (1/2) * (
                 scores["cmmd_test"] / (scores["cmmd_train"] + scores["cmmd_test"])
         )
 
-    if "cmmd" in args.metrics:
+    if "m_palate" in args.metrics:
         print("Computing cmmd")
-        scores["cmmd_train"], mianownik, _ = cmmd(*reps)
-        test_comparison = [reps[1], test_reps]
+        scores["cmmd_train"], mianownik, _ = cmmd(*train_gen_representations)
+        test_comparison = [train_gen_representations[1], test_representations]
         scores["cmmd_test"], scores["mianownik_test"], all_components = cmmd(*test_comparison)
 
         scores["k_xx"] = all_components["k_xx"]
@@ -324,7 +313,7 @@ def compute_scores(args, reps, test_reps, labels=None):
         scores["pierwszy_skladnik"] = scores["cmmd_test"] / (2 * scores["mianownik_test"])
         scores["drugi_skladnik"] = scores["cmmd_test"] / (scores["cmmd_train"] + scores["cmmd_test"])
 
-        scores["MMM_cmmd"] = scores["cmmd_test"] / (2 * scores["mianownik_test"]) + (1/2) * (
+        scores["m_palate"] = scores["cmmd_test"] / (2 * scores["mianownik_test"]) + (1/2) * (
                 scores["cmmd_test"] / (scores["cmmd_train"] + scores["cmmd_test"])
         )
 
@@ -332,42 +321,41 @@ def compute_scores(args, reps, test_reps, labels=None):
         print("Computing fld")
         if args.eval_feat == "gap":
             fld = FLD(gen_size=args.fld_gen_size, eval_feat=args.eval_feat).compute_metric(
-                train_feat=torch.tensor(reps[0]),
-                test_feat=torch.tensor(test_reps),
-                gen_feat=torch.tensor(reps[1]),
+                train_feat=torch.tensor(train_gen_representations[0]),
+                test_feat=torch.tensor(test_representations),
+                gen_feat=torch.tensor(train_gen_representations[1]),
             )
             scores["fld_gap"] = fld
-        else:
-            fld = FLD(gen_size=args.fld_gen_size, eval_feat=args.eval_feat).compute_metric(
-                train_feat=torch.tensor(reps[0]),
-                test_feat=torch.tensor(test_reps),
-                gen_feat=torch.tensor(reps[1]),
-            )
-            scores["fld"] = fld
+
+        fld = FLD(gen_size=args.fld_gen_size, eval_feat="test").compute_metric(
+            train_feat=torch.tensor(train_gen_representations[0]),
+            test_feat=torch.tensor(test_representations),
+            gen_feat=torch.tensor(train_gen_representations[1]),
+        )
+        scores["fld"] = fld
 
     if "fd" in args.metrics:
         print("Computing FD \n", file=sys.stderr)
-        scores["fid_train"] = compute_FD_with_reps(*reps)
-        test_comparison = [reps[1], test_reps]
+        scores["fid_train"] = compute_FD_with_reps(*train_gen_representations)
+        test_comparison = [train_gen_representations[1], test_representations]
         scores["fid_test"] = compute_FD_with_reps(*test_comparison)
-        scores["MMM_fd"] = (scores["fid_test"] / (scores["fid_train"] + scores["fid_test"])) / 2
         scores["fid_gap"] = scores["fid_train"] - scores["fid_test"]
 
 
     if "fd_eff" in args.metrics:
         print("Computing Efficient FD \n", file=sys.stderr)
-        scores["fd_eff"] = compute_efficient_FD_with_reps(*reps)
+        scores["fd_eff"] = compute_efficient_FD_with_reps(*train_gen_representations)
 
     if "fd-infinity" in args.metrics:
         print("Computing fd-infinity \n", file=sys.stderr)
-        scores["fd_infinity_value"] = compute_FD_infinity(*reps)
+        scores["fd_infinity_value"] = compute_FD_infinity(*train_gen_representations)
 
     if "kd" in args.metrics:
         print("Computing KD \n", file=sys.stderr)
-        mmd_values = compute_mmd(*reps)
+        mmd_values = compute_mmd(*train_gen_representations)
         scores["kd_value"] = mmd_values.mean()
         scores["kd_variance"] = mmd_values.std()
-        test_comparison = [reps[1], test_reps]
+        test_comparison = [train_gen_representations[1], test_representations]
         mmd_values_test = compute_mmd(*test_comparison)
         scores["kd_value_test"] = mmd_values_test.mean()
         scores["kd_variance_test"] = mmd_values_test.std()
@@ -377,10 +365,10 @@ def compute_scores(args, reps, test_reps, labels=None):
 
     if "prdc" in args.metrics:
         print("Computing precision, recall, density, and coverage \n", file=sys.stderr)
-        reduced_n = min(args.reduced_n, reps[0].shape[0], reps[1].shape[0])
-        inds0 = np.random.choice(reps[0].shape[0], reduced_n, replace=False)
+        reduced_n = min(args.reduced_n, train_gen_representations[0].shape[0], train_gen_representations[1].shape[0])
+        inds0 = np.random.choice(train_gen_representations[0].shape[0], reduced_n, replace=False)
 
-        inds1 = np.arange(reps[1].shape[0])
+        inds1 = np.arange(train_gen_representations[1].shape[0])
         if "realism" not in args.metrics:
             # Realism is returned for each sample, so do not shuffle if this metric is desired.
             # Else filenames and realism scores will not align
@@ -389,8 +377,8 @@ def compute_scores(args, reps, test_reps, labels=None):
             )
 
         prdc_dict = compute_prdc(
-            reps[0][inds0],
-            reps[1][inds1],
+            train_gen_representations[0][inds0],
+            train_gen_representations[1][inds1],
             nearest_k=args.nearest_k,
             realism=True if "realism" in args.metrics else False,
         )
@@ -399,46 +387,46 @@ def compute_scores(args, reps, test_reps, labels=None):
     if "vendi" in args.metrics:
         print("Calculating diversity score", file=sys.stderr)
         # scores['vendi'] = compute_vendi_score(reps[1])
-        vendi_scores = compute_per_class_vendi_scores(reps[1], labels)
+        vendi_scores = compute_per_class_vendi_scores(train_gen_representations[1], labels)
         scores["mean vendi per class"] = vendi_scores.mean()
 
     if "authpct" in args.metrics:
         print("Computing authpct \n", file=sys.stderr)
-        scores["authpct"] = compute_authpct(*reps)
+        scores["authpct"] = compute_authpct(*train_gen_representations)
 
     if "sw_approx" in args.metrics:
         print("Aprroximating Sliced W2.", file=sys.stderr)
-        scores["sw_approx"] = sw_approx(*reps)
+        scores["sw_approx"] = sw_approx(*train_gen_representations)
 
     if "ct" in args.metrics:
         print("Computing ct score \n", file=sys.stderr)
-        scores["ct"] = compute_CTscore(reps[0], test_reps, reps[1])
+        scores["ct"] = compute_CTscore(train_gen_representations[0], test_representations, train_gen_representations[1])
 
     if "ct_test" in args.metrics:
         print(
             "Computing ct score, modified to identify mode collapse only \n",
             file=sys.stderr,
         )
-        scores["ct_test"] = compute_CTscore_mode(reps[0], test_reps, reps[1])
+        scores["ct_test"] = compute_CTscore_mode(train_gen_representations[0], test_representations, train_gen_representations[1])
 
     if "ct_modified" in args.metrics:
         print(
             "Computing ct score, modified to identify memorization only \n",
             file=sys.stderr,
         )
-        scores["ct_modified"] = compute_CTscore_mem(reps[0], test_reps, reps[1])
+        scores["ct_modified"] = compute_CTscore_mem(train_gen_representations[0], test_representations, train_gen_representations[1])
 
     if "fls" in args.metrics or "fls_overfit" in args.metrics:
-        train_reps, gen_reps = reps[0], reps[1]
+        train_reps, gen_reps = train_gen_representations[0], train_gen_representations[1]
         reduced_n = min(
             args.reduced_n,
             train_reps.shape[0] // 2,
-            test_reps.shape[0],
+            test_representations.shape[0],
             gen_reps.shape[0],
         )
 
-        test_reps = test_reps[
-            np.random.choice(test_reps.shape[0], reduced_n, replace=False)
+        test_representations = test_representations[
+            np.random.choice(test_representations.shape[0], reduced_n, replace=False)
         ]
         gen_reps = gen_reps[
             np.random.choice(gen_reps.shape[0], reduced_n, replace=False)
@@ -452,10 +440,10 @@ def compute_scores(args, reps, test_reps, labels=None):
         train_reps, baseline_reps = train_reps[:reduced_n], train_reps[reduced_n:]
 
         if "fls" in args.metrics:
-            scores["fls"] = compute_fls(train_reps, baseline_reps, test_reps, gen_reps)
+            scores["fls"] = compute_fls(train_reps, baseline_reps, test_representations, gen_reps)
         if "fls_overfit" in args.metrics:
             scores["fls_overfit"] = compute_fls_overfit(
-                train_reps, baseline_reps, test_reps, gen_reps
+                train_reps, baseline_reps, test_representations, gen_reps
             )
 
     for key, value in scores.items():
@@ -565,52 +553,56 @@ def get_model(args, device):
         sinception=True if args.model == "sinception" else False,
         depth=args.depth,
     )
-def load_reps(args):
-    real_path = os.path.join(args.path[0], "repr.npz")
-    print(f"{real_path=}")
-    saved_file = np.load(real_path)
-    reps_real = saved_file["reps"]
-    print("Loaded reps real")
-    repsi_test = None
+def load_train_test_representations(args):
+    print("Loading train and test representations")
+    train_path = os.path.join(args.path[0], "repr.npz")
+    print(f"{train_path=}")
+    train_saved_file = np.load(train_path)
+    train_representations = train_saved_file["reps"]
+    print("Loaded train representations")
+    test_representations = None
     if args.test_path is not None:
         test_path = os.path.join(args.test_path, "repr.npz")
         print(f"{test_path=}")
-        saved_file = np.load(test_path)
-        repsi_test = saved_file["reps"]
-        print("Loaded reps test")
-    return reps_real, repsi_test
+        test_saved_file = np.load(test_path)
+        test_representations = test_saved_file["reps"]
+        print("Loaded test representations")
+    return train_representations, test_representations
 
-def compute_start_reps(args, model, device, num_workers):
-    dataloader_real = get_dataloader_from_path(
+def compute_start_representations(args, model, device, num_workers):
+    print("Computing train and test representation from paths")
+    print(f"train path: {args.path[0]}")
+    print(f"test path: {args.test_path}")
+    train_dataloader = get_dataloader_from_path(
         args.path[0], model.transform, num_workers, args
     )
-    reps_real = compute_representations(dataloader_real, model, device, args)
+    train_representations = compute_representations(train_dataloader, model, device, args)
 
-    # Get test representations
-    repsi_test = None
+    test_representations = None
+    test_dataloader = None
     if args.test_path is not None:
-        dataloader_test = get_dataloader_from_path(
+        test_dataloader = get_dataloader_from_path(
             args.test_path, model.transform, num_workers, args
         )
 
-        repsi_test = compute_representations(dataloader_test, model, device, args)
-    return reps_real, repsi_test
+        test_representations = compute_representations(test_dataloader, model, device, args)
+    return train_representations, test_representations, train_dataloader, test_dataloader
 
 
-def compute_repsi(path, model, num_workers, args, device):
-    print("compute_repsi")
-    dataloaderi = get_dataloader_from_path(
+def compute_gen_representations(path, model, num_workers, args, device):
+    print("Getting gen dataloader")
+    gen_dataloader = get_dataloader_from_path(
         path,
         model.transform,
         num_workers,
         args,
         sample_w_replacement=True if ":train" in path else False,
     )
-    return compute_representations(dataloaderi, model, device, args), dataloaderi
+    return compute_representations(gen_dataloader, model, device, args), gen_dataloader
 
 
 def main():
-    print("main")
+    print("Running main()")
     args = parser.parse_args()
     device, num_workers = get_device_and_num_workers(args.device, args.num_workers)
 
@@ -622,43 +614,22 @@ def main():
     print("Loading Model", file=sys.stderr)
     # Get train representations
     model = get_model(args, device)
-    if args.reps or args.use_test_train_repr:
-        reps_real, repsi_test = load_reps(args)
+    if args.use_train_test_repr:
+        train_representations, test_representations = load_train_test_representations(args)
     else:
-        reps_real, repsi_test = compute_start_reps(args, model, device, num_workers)
+        train_representations, test_representations, train_dataloader, test_dataloader = compute_start_representations(args, model, device, num_workers)
     # Loop over all generated paths
     all_scores = {}
     vendi_scores = {}
     for i, path in enumerate(args.path[1:]):
-        if args.reps:
-            real_dataset_path = path.split("/")
-            print(real_dataset_path)
-            real_dataset_path.remove(args.model)
-            real_dataset_path.remove('interpolation')
-            real_dataset_path.remove('0%train')
-            target_pos = real_dataset_path.index("CIFAR10-dgm_eval_reps")
-            real_dataset_path[target_pos] = "CIFAR10-dgm_eval"
-            new_path = "/".join(real_dataset_path)
-            dataloaderi = get_dataloader_from_path(
-                new_path,
-                model.transform,
-                num_workers,
-                args,
-                sample_w_replacement=True if ":train" in path else False,
-            )
-            saved_file = np.load(os.path.join(path, "repr.npz"))
-            print("Loaded f{path=}")
-            repsi = saved_file["reps"]
-            reps = [reps_real, repsi]
-        else:
-            repsi, dataloaderi = compute_repsi(path, model, num_workers, args, device)
-            reps = [reps_real, repsi]
+        gen_representations, gen_dataloader = compute_gen_representations(path, model, num_workers, args, device)
+        train_gen_representations = [train_representations, gen_representations]
 
         print(
             f"Computing scores between reference dataset and {path}\n", file=sys.stderr
         )
         scores_i, vendi_scores_i = compute_scores(
-            args, reps, repsi_test, dataloaderi.labels
+            args, train_gen_representations, test_representations, gen_dataloader.labels
         )
         if vendi_scores_i is not None:
             vendi_scores[os.path.basename(path)] = vendi_scores_i
@@ -679,17 +650,17 @@ def main():
         if args.heatmaps:
             print("Visualizing FD gradient with gradcam\n", file=sys.stderr)
             heatmap_suffix = (
-                f"{args.model}_{dataloader_real.dataset_name}_{dataloaderi.dataset_name}"
+                f"{args.model}_{train_dataloader.dataset_name}_{gen_dataloader.dataset_name}"
                 + f"{'_perturbation' if args.heatmaps_perturbation else ''}_{args.seed}"
             )
             visualize_heatmaps(
-                reps_real,
-                repsi,
+                train_representations,
+                gen_representations,
                 model,
-                dataset=dataloaderi.data_set,
+                dataset=gen_dataloader.data_set,
                 results_dir=args.output_dir,
                 results_suffix=heatmap_suffix,
-                dataset_name=dataloaderi.dataset_name,
+                dataset_name=gen_dataloader.dataset_name,
                 device=device,
                 perturbation=args.heatmaps_perturbation,
                 random_seed=args.seed,

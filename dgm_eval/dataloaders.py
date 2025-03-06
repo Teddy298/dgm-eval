@@ -1,14 +1,14 @@
 import os
 import sys
 import pathlib
-
+from io import BytesIO
 import numpy as np
 import torch
 import torchvision
 
 import torchvision.transforms
 import io
-
+import torchvision.transforms.functional as F
 
 from PIL import Image
 
@@ -25,24 +25,28 @@ def get_files_at_path(path):
                     for file in path.glob(f'*.{ext}')])
 
     return files
-def apply_jpeg_compression(img, quality=75):
-    # Convert the tensor to a PIL image
-    img = torchvision.transforms.ToPILImage()(img)
-    
-    # Create a buffer to store the image data
-    buffer = io.BytesIO()
-    
-    # Save the image as JPEG with the specified quality
-    img.save(buffer, format="JPEG", quality=quality)
-    
-    # Load the image back from the buffer
-    buffer.seek(0)
-    img = Image.open(buffer)
-    
-    # Convert the PIL image back to a tensor
-    img = torchvision.transforms.ToTensor()(img)
-    
-    return img
+
+
+def center_crop_with_padding(img, x):
+    """Center crop the image to (x, x) and pad the rest with black."""
+    img_cropped = F.center_crop(img, [x, x])  # Center crop
+    h, w, _ = np.array(img).shape  # Get original dimensions (assuming format CxHxW)
+
+    pad_top = (h - x) // 2
+    pad_bottom = h - x - pad_top
+    pad_left = (w - x) // 2
+    pad_right = w - x - pad_left
+
+    img_padded = F.pad(img_cropped, [pad_left, pad_top, pad_right, pad_bottom], fill=0)  # Fill with black
+    return img_padded
+
+
+def convert_to_jpg(img, quality):
+    """Convert an image to JPG with the specified quality."""
+    buffer = BytesIO()
+    img.save(buffer, format="JPEG", quality=quality)  # Save as JPEG with given quality
+    img_jpg = Image.open(buffer)  # Reload as PIL Image
+    return img_jpg
 
 class ImagePathDataset(torch.utils.data.Dataset):
     """
@@ -61,38 +65,33 @@ class ImagePathDataset(torch.utils.data.Dataset):
     def __getitem__(self, i):
         path = self.files[i]
         img = Image.open(path).convert('RGB')
+        if self.distortion == "none":
+            pass
+        elif self.distortion == "posterize":
+            img = torchvision.transforms.functional.posterize(img, 5)
+        elif self.distortion == "blur":
+            light_blur = torchvision.transforms.GaussianBlur(kernel_size=5, sigma=(0.5))  # Light Gaussian blur
+            img = light_blur(img)
+        elif self.distortion == "heavy_blur":
+            heavy_blur = torchvision.transforms.GaussianBlur(kernel_size=5, sigma=1.4)  # Heavy Gaussian blur
+            img = heavy_blur(img)
+        elif self.distortion == "resize":
+            img = torchvision.transforms.Resize((299, 299), interpolation=torchvision.transforms.InterpolationMode.BICUBIC)(img)
+        elif self.distortion == "center_crop30":
+            img = center_crop_with_padding(img, 30)
+        elif self.distortion == "center_crop28":
+            img = center_crop_with_padding(img, 28)
+        elif self.distortion == "color_distort":
+            img = torchvision.transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05)(img)  # Random color distortion
+        elif self.distortion == "elastic_transform":
+            elastic_transform = torchvision.transforms.ElasticTransform()  # Elastic transformation
+            img = elastic_transform(img)
+        elif self.distortion == "jpg75":
+            img = convert_to_jpg(img, quality=75)
+        elif self.distortion == "jpg90":
+            img = convert_to_jpg(img, quality=90)
         if self.transform is not None:
             img = self.transform(img)
-           # if self.distortion == "none":
-           #     pass
-           # elif self.distortion == "posterize":
-           #     posterize = torchvision.transforms.Lambda(lambda img: ((img * 255).to(torch.uint8) & 0b11110000).float() / 255.0)
-           #     img = posterize(img)
-           # elif self.distortion == "blur":
-           #     light_blur = torchvision.transforms.GaussianBlur(kernel_size=3, sigma=(0.5))  # Light Gaussian blur
-           #     img = light_blur(img)
-           # elif self.distortion == "heavy_blur":
-           #     heavy_blur = torchvision.transforms.GaussianBlur(kernel_size=5, sigma=1.4)  # Heavy Gaussian blur
-           #     img = heavy_blur(img)
-           # elif self.distortion == "resize":
-           #     resize = torchvision.transforms.Resize((196, 196))  # Resize to 224x224
-           #     img = resize(img)
-           # elif self.distortion == "center_crop30":
-           #     center_crop_30 = torchvision.transforms.CenterCrop(30)  # Center crop to 30x30
-           #     img = center_crop_30(img)
-           # elif self.distortion == "center_crop28":
-           #     center_crop_28 = torchvision.transforms.CenterCrop(28)  # Center crop to 30x30
-           #     img = center_crop_28(img)
-           # elif self.distortion == "color_distort":
-           #     color_distort = torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)  # Random color distortion
-           #     img = color_distort(img)
-           # elif self.distortion == "elastic_transform":
-           #     elastic_transform = torchvision.transforms.ElasticTransform()  # Elastic transformation
-           #     img = elastic_transform(img)
-           # elif self.distortion == "jpg75":
-           #     img = apply_jpeg_compression(img, quality=75)
-           # elif self.distortion == "jpg90":
-           #     img = apply_jpeg_compression(img, quality=90)
         return img
 
 class DataLoader():
@@ -137,10 +136,11 @@ class DataLoader():
         Get dataset from local path or from torchvision.datasets
         """
         if os.path.exists(self.path):
-            print("LOCAL DATASET")
+            print("Getting dataset from path")
             self.get_local_dataset()
 
         else:
+            print(f"Provided path: {self.path} doesn't exist. Trying to load as torchvision dataset...")
             self.get_torchvision_dataset()
 
     def get_local_dataset(self):
@@ -252,7 +252,6 @@ class DataLoader():
 
 def get_dataloader(path, nsample=-1, batch_size=32, num_workers=1, transform=None, seed=13579, random_sample=True, sample_w_replacement=False, k=10, distortion="none"):
     """Deal with format of input path, and get relevant DataLoader"""
-    print("dataloaders.py")
     train_str='test'
     if ':' in path:
         # Path is instead torchvision.dataset

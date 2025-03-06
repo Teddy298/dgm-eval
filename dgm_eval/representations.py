@@ -86,16 +86,22 @@ def save_outputs(output_dir, reps, model, checkpoint, DataLoader):
     hyperparams.pop("data_loader")
     hyperparams.pop("data_set")
 
+    print(f"Saving representations to {out_path}")
     np.savez(out_path, model=model, reps=reps, hparams=hyperparams)
 
 def load_reps_from_path(saved_dir, model, checkpoint, DataLoader):
     """Save representations and other info to disk at file_path"""
     save_path = get_path(saved_dir, model, checkpoint, DataLoader)
     reps = None
-    print('Loading from:', save_path)
+    print('Trying to load from from:', save_path)
     if os.path.exists(f'{save_path}.npz'):
         saved_file = np.load(f'{save_path}.npz')
         reps = saved_file['reps']
+        print('Loaded successfully from:', save_path)
+
+    else:
+        print("Path doesn't exist:", save_path)
+
     return reps
 
 def get_path(output_dir, model, checkpoint, DataLoader):
