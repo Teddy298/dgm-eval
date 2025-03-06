@@ -7,9 +7,9 @@ import json
 import math
 import warnings
 
-from ..utils import shuffle
-from .Metric import Metric
-from ..MoG import preprocess_feat, MoG
+from fld.utils import shuffle
+from fld.metrics.Metric import Metric
+from fld.MoG import preprocess_feat, MoG
 
 
 GEN_SIZE = 10000
