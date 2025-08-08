@@ -177,8 +177,16 @@ class DataLoader():
                 self.files += files_in_path
                 self.labels.extend([class_idx for _ in range(len(files_in_path))])
                 class_idx += 1
+
+        for file_path in self.files:
+            filename = os.path.basename(file_path)           # e.g. "9_9000_seed97374.png"
+            class_idx = int(filename.split("_")[0])          # take the "9" before first underscore
+            self.labels.append(class_idx)
+
         self.labels = np.array(self.labels, dtype=np.int32)
-        # print(f'len labels {len(self.labels)}')
+
+        self.labels = np.array(self.labels, dtype=np.int32)
+        print(f'len labels {len(self.labels)}')
 
         # Confirm data at path is in proper format
         try:

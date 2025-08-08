@@ -5,10 +5,7 @@ import sys
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 
 import numpy as np
-import pandas as pd
-import torch
 import time
-import pathlib
 
 from .__main__ import (
     get_device_and_num_workers,
@@ -220,7 +217,7 @@ def get_relevant_paths(main_folder_path):
     rel_paths = []
     for x in os.walk(main_folder_path):
         path = x[0]
-        if ('80%' in path) and ('DDIM' in path):
+        if ('train' in path) and ('%' not in path) and ('domino' not in path):
                 rel_paths.append(path)
     return rel_paths
 

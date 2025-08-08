@@ -185,7 +185,7 @@ parser.add_argument(
 parser.add_argument(
     "--k",
     type=int,
-    default=0,
+    default=10,
     help="Num of classes to take: k.",
 )
 parser.add_argument(
@@ -229,8 +229,8 @@ def get_dataloader_from_path(
         seed=args.seed,
         sample_w_replacement=sample_w_replacement,
         transform=lambda x: model_transform(x),
-        k=args.k,
-        distortion=args.distortion,
+        k=10,
+        distortion='none',
     )
     print("DataLoader loaded")
     return dataloader
